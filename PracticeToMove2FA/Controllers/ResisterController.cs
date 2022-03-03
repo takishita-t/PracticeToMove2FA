@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Net.Mail;
+using MimeKit;
+using MailKit.Security;
 
 namespace PracticeToMove2FA.Controllers
 {
@@ -28,9 +30,7 @@ namespace PracticeToMove2FA.Controllers
 
         public async Task<IActionResult> OnPostAsync()
         {
-            if (ModelState.IsValid) return Ok();
-
-            //validateing Email address
+            //if (ModelState.IsValid) return Page();
 
             //Create the user　登録時の設定
             var user = new IdentityUser
@@ -47,19 +47,23 @@ namespace PracticeToMove2FA.Controllers
                 var confirmationToken = await this.userManager.GenerateEmailConfirmationTokenAsync(user);
                 var confirmationLink = Url.PageLink(pageName: "/Account/ConfirmEmail", values: new { userId = user.Id, token = confirmationToken });
 
-                //Send Mail
-                var message = new MailMessage(
-                    "0209takumi.t@gmail.com",
-                    user.Email,
-                    "Please confirm your email",
-                    $"Please click on this link to confirm your email address: { confirmationToken }");
-                using (var emailClient = new SmtpClient("smtp-relay.sendinblue.com", 587))
-                {
-                    emailClient.Credentials = new NetworkCredential(
-                    "0209takumi.t@gmail.com",
-                    "aVnLsqZwOJIjx5GU");
+                //send mail
+                var emailMessage = new MimeMessage();
 
-                    await emailClient.SendMailAsync(message);
+                emailMessage.From.Add(new MailboxAddress("", "test@example.com"));
+
+                emailMessage.To.Add(new MailboxAddress("test@test.com", "test@test.com"));
+
+                emailMessage.Subject = "Confirm your email";
+
+                emailMessage.Body = new TextPart("plain") { Text = $"Confirm your email {confirmationLink}" };
+
+                using (var client = new MailKit.Net.Smtp.SmtpClient())
+                {
+                    await client.ConnectAsync("localhost", 1025, SecureSocketOptions.Auto);
+                    //await client.AuthenticateAsync(_sendMailParams.User, _sendMailParams.Password);
+                    await client.SendAsync(emailMessage);
+                    await client.DisconnectAsync(true);
                 }
                 //return RedirectToPage("/Account/Login");
                 return Ok("ok");
@@ -70,7 +74,6 @@ namespace PracticeToMove2FA.Controllers
                 {
                     ModelState.AddModelError(string.Empty, error.Description);
                 }
-                return Ok("NG");
             }
         }
     }
@@ -78,7 +81,7 @@ namespace PracticeToMove2FA.Controllers
     {
         [Required]
         [EmailAddress(ErrorMessage = "Invaild email address.")]
-        public string Email { get; set; } = "0209takumi.t@gmail.com";
+        public string Email { get; set; } = "test@test.com";
 
         [Required]
         [DataType(dataType: DataType.Password)]
